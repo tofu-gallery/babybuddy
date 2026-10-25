@@ -46,3 +46,14 @@ BABY_BUDDY["ALLOW_UPLOADS"] = bool(
 # No admin/admin account: while the copy has no account at all, the login page asks for the first one, which
 # becomes the administrator (babybuddy/first_account.py).
 BABY_BUDDY["FIRST_ACCOUNT_SETUP"] = True
+
+# Django's warnings and errors go to the app's runtime log (standard error), where the owner can read them on
+# Tofu. Upstream keeps Django's default logging, which with DEBUG off only mails a request's error (a 500 and
+# its traceback) to ADMINS, and a copy has none, so the log showed nothing about it. Warnings include a form
+# refused by the CSRF check, with the reason, and a page not found.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django": {"handlers": ["console"], "level": "WARNING"}},
+}
