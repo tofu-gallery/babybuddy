@@ -210,6 +210,16 @@ class NoteAdmin(ImportExportMixin, ExportActionMixin, admin.ModelAdmin):
     search_fields = ("child__last_name",)
     resource_class = NoteImportExportResource
 
+    # Tofu (2026-10-25): while uploads are off, no image field, as ChildAdmin
+    # leaves out the picture and NoteForm the image. Upstream's NoteAdmin
+    # showed every field, so the admin still wrote an image to the server's
+    # disk, which a copy on Tofu loses at its next restart.
+    def get_exclude(self, request, obj=None):
+        exclude = super().get_exclude(request, obj)
+        if settings.BABY_BUDDY["ALLOW_UPLOADS"]:
+            return exclude
+        return (*(exclude or ()), "image")
+
 
 class SleepImportExportResource(ImportExportResourceBase):
     class Meta:

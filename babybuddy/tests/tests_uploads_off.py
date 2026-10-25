@@ -123,3 +123,45 @@ class APIUploadsTestCase(UploadsTestCaseBase):
         image = models.Note.objects.get(pk=response.data["id"]).image
         self.assertTrue(image.name.startswith("notes/images/"))
         self.assertEqual(len(self.files_written()), 1)
+
+
+class AdminUploadsTestCase(UploadsTestCaseBase):
+    """
+    While uploads are off, the admin's note form has no image field
+    (core.admin.NoteAdmin), as its child form has no picture field.
+    """
+
+    def post_note(self):
+        return self.client.post(
+            reverse("admin:core_note_add"),
+            {
+                "child": 1,
+                "note": "An admin note with an image.",
+                "time_0": "2026-10-25",
+                "time_1": "08:30:00",
+                "image": image_upload(),
+                "_save": "Save",
+            },
+        )
+
+    @uploads(False)
+    def test_note_form_has_no_image_without_uploads(self):
+        response = self.client.get(reverse("admin:core_note_add"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("image", response.context["adminform"].form.fields)
+
+    @uploads(False)
+    def test_note_image_not_kept_without_uploads(self):
+        response = self.post_note()
+        self.assertRedirects(response, reverse("admin:core_note_changelist"))
+        note = models.Note.objects.get(note="An admin note with an image.")
+        self.assertFalse(note.image)
+        self.assertEqual(self.files_written(), [])
+
+    @uploads(True)
+    def test_note_image_kept_with_uploads(self):
+        response = self.post_note()
+        self.assertRedirects(response, reverse("admin:core_note_changelist"))
+        note = models.Note.objects.get(note="An admin note with an image.")
+        self.assertTrue(note.image.name.startswith("notes/images/"))
+        self.assertEqual(len(self.files_written()), 1)
