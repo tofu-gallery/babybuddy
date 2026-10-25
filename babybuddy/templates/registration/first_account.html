@@ -1,0 +1,49 @@
+{% extends "registration/base.html" %}
+{% comment %}Tofu (2026-10-25): this template is Tofu's addition; it is not part of upstream Baby Buddy. See babybuddy/first_account.py.{% endcomment %}
+{% load i18n static widget_tweaks %}
+{% block title %}
+    {% trans "Create the first account" %}
+{% endblock %}
+{% block content %}
+    <form class="login-form" method="post" action="{% url 'babybuddy:first-account' %}">
+        {% csrf_token %}
+        <div class="text-center mb-4">
+            <p class="mb-1">
+                <strong>{% trans "This Baby Buddy has no account yet." %}</strong>
+            </p>
+            <p class="mb-0">
+                {% blocktrans trimmed %}
+                    Create the first account below. It becomes the administrator, who adds
+                    everyone else under Users. Once it exists, this page closes.
+                {% endblocktrans %}
+            </p>
+        </div>
+        {% if form.errors %}
+            <div class="alert alert-danger">
+                {% for field in form %}
+                    {% for error in field.errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+        <label class="visually-hidden" for="username-input-group">{{ form.username.label }}</label>
+        <div class="input-group mb-3 fade-in">
+            <span class="input-group-text text-body-secondary"><i class="icon-user" aria-hidden="true"></i></span>
+            {% render_field form.username name='username' class+='form-control' id='username-input-group' placeholder=form.username.label %}
+        </div>
+        <label class="visually-hidden" for="password1-input-group">{{ form.password1.label }}</label>
+        <div class="input-group mb-3 fade-in">
+            <span class="input-group-text text-body-secondary"><i class="icon-lock" aria-hidden="true"></i></span>
+            {% render_field form.password1 name='password1' class+='form-control' id='password1-input-group' placeholder=form.password1.label %}
+        </div>
+        <label class="visually-hidden" for="password2-input-group">{{ form.password2.label }}</label>
+        <div class="input-group mb-3 fade-in">
+            <span class="input-group-text text-body-secondary"><i class="icon-lock" aria-hidden="true"></i></span>
+            {% render_field form.password2 name='password2' class+='form-control' id='password2-input-group' placeholder=form.password2.label %}
+        </div>
+        <p class="small mb-3">
+            {% trans "At least 8 characters, not only numbers, and not a common password." %}
+        </p>
+        <button class="btn btn-primary w-100 fade-in" type="submit" name="create">{% trans "Create account" %}</button>
+    </form>
+{% endblock %}

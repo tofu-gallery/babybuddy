@@ -5,10 +5,13 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path, reverse_lazy
 
-from . import views
+from . import first_account, views
 
 app_patterns = [
-    path("login/", auth_views.LoginView.as_view(), name="login"),
+    # Tofu (2026-10-25): the login view sends visitors to the first-account page while the app has no account
+    # and BABY_BUDDY["FIRST_ACCOUNT_SETUP"] is on (babybuddy/first_account.py); otherwise it is Django's own.
+    path("login/", first_account.LoginView.as_view(), name="login"),
+    path("first-account/", first_account.FirstAccount.as_view(), name="first-account"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path(
         "reset/",
