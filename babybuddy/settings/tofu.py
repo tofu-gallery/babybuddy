@@ -36,9 +36,13 @@ if os.environ.get("DATABASE_URL"):
             ("baby-buddy-secret-key:" + os.environ["DATABASE_URL"]).encode()
         ).hexdigest()
 
-# A copy has no lasting disk: an uploaded child photo would be lost at the next restart, and nothing serves
-# MEDIA_ROOT outside DEBUG. Uploads stay off unless the owner sets ALLOW_UPLOADS=true together with a storage
-# bucket (AWS_STORAGE_BUCKET_NAME and its keys, read by base.py).
+# A copy has no lasting disk. Without a storage bucket an uploaded file, a child's picture or a note's image,
+# is written to MEDIA_ROOT on the server's disk, which nothing serves outside DEBUG and the next restart
+# loses while the database still names it; the pages showing its thumbnail (the child list, the child's page,
+# the note list) then fail with a server error. So uploads stay off: the web forms and the admin have no
+# picture or image field (core/forms.py, core/admin.py), and the REST API keeps neither (api/serializers.py).
+# The owner can turn them on with ALLOW_UPLOADS=true together with a storage bucket (AWS_STORAGE_BUCKET_NAME
+# and its keys, read by base.py).
 BABY_BUDDY["ALLOW_UPLOADS"] = bool(
     strtobool(os.environ.get("ALLOW_UPLOADS") or "False")
 )
