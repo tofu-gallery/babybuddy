@@ -7,3 +7,5 @@
 !gitpod.py
 !production.example.py
 !test.py
+# Tofu (2026-10-25): babybuddy.settings.tofu, the settings of Tofu's gallery copy (TOFU.md).
+!tofu.py
