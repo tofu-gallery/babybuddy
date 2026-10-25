@@ -18,6 +18,28 @@ from babybuddy import models as babybuddy_models
 from webhooks import models as webhooks_models
 
 
+class UploadFieldsSerializer:
+    """
+    Tofu (2026-10-25): Tofu's addition, not part of upstream Baby Buddy.
+
+    Make the file fields named in ``upload_fields`` read-only while uploads are
+    off (``BABY_BUDDY["ALLOW_UPLOADS"]``, off by default on Tofu), as the web
+    forms and the admin leave them out. Without a storage bucket a file sent
+    here would be written to the server's own disk, which a copy on Tofu loses
+    at its next restart, and the pages showing its thumbnail would then fail.
+    A file sent anyway is ignored, and the response shows the field empty.
+    """
+
+    upload_fields = ()
+
+    def get_extra_kwargs(self):
+        extra_kwargs = super().get_extra_kwargs()
+        if not settings.BABY_BUDDY["ALLOW_UPLOADS"]:
+            for field_name in self.upload_fields:
+                extra_kwargs.setdefault(field_name, {})["read_only"] = True
+        return extra_kwargs
+
+
 class CoreModelSerializer(serializers.HyperlinkedModelSerializer):
     """
     Provide the child link (used by most core models) and run model clean()
@@ -162,7 +184,11 @@ class PumpingSerializer(CoreModelWithDurationSerializer, TaggableSerializer):
         )
 
 
-class ChildSerializer(serializers.HyperlinkedModelSerializer):
+# Tofu (2026-10-25): UploadFieldsSerializer, so that while uploads are off the
+# API keeps no picture.
+class ChildSerializer(UploadFieldsSerializer, serializers.HyperlinkedModelSerializer):
+    upload_fields = ("picture",)
+
     class Meta:
         model = models.Child
         fields = (
@@ -240,7 +266,11 @@ class MedicationSerializer(CoreModelSerializer, TaggableSerializer):
         )
 
 
-class NoteSerializer(CoreModelSerializer, TaggableSerializer):
+# Tofu (2026-10-25): UploadFieldsSerializer, so that while uploads are off the
+# API keeps no image.
+class NoteSerializer(UploadFieldsSerializer, CoreModelSerializer, TaggableSerializer):
+    upload_fields = ("image",)
+
     class Meta:
         model = models.Note
         fields = ("id", "child", "note", "image", "time", "tags")
