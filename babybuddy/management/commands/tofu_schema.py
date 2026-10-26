@@ -12,5 +12,15 @@ class Command(BaseCommand):
     # Like `migrate`, which it replaces at a start: the system checks would only make the start slower.
     requires_system_checks = []
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--make-snapshot",
+            action="store_true",
+            help="Write babybuddy/tofu_schema.sql from an empty scratch PostgreSQL database (needs pg_dump).",
+        )
+
     def handle(self, *args, **options):
-        tofu_schema.start(self.stdout.write)
+        if options["make_snapshot"]:
+            tofu_schema.make_snapshot(self.stdout.write)
+        else:
+            tofu_schema.start(self.stdout.write)
