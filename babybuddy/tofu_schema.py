@@ -15,11 +15,16 @@
 # - A database that is up to date skips `migrate`, which even with nothing to apply sends about 700 statements
 #   (its post-migrate steps), each a round trip through the pooler. One with migrations left to apply gets
 #   `migrate`, as upstream's start does.
+# - Row-level security is turned on for every table of the app that lacks it, in the same locked step. With no
+#   policy, the database's Data API roles (anon, authenticated) see no row; the app's own connection owns the tables
+#   and is not limited by it.
 import time
 
+from django.conf import settings
 from django.core.management import call_command
 from django.db import DatabaseError, connection, connections
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 
 # The lock's key, the same in every start of this app: zlib.crc32(b"babybuddy:tofu-schema").
 LOCK_KEY = 1015805802
@@ -27,6 +32,37 @@ LOCK_KEY = 1015805802
 LOCK_WAIT = "120s"
 # duplicate_table, duplicate_object, duplicate_column, unique_violation
 DUPLICATE_ERRORS = {"42P07", "42710", "42701", "23505"}
+
+
+def app_tables():
+    """The tables the app's code makes: its models' tables, Django's migration record and the cache table."""
+    tables = set(connection.introspection.django_table_names())
+    tables.add(MigrationRecorder.Migration._meta.db_table)
+    for cache in settings.CACHES.values():
+        if cache["BACKEND"] == "django.core.cache.backends.db.DatabaseCache":
+            tables.add(cache["LOCATION"])
+    return sorted(tables)
+
+
+def close_tables(cursor, tables):
+    """Turns on row-level security on each of these tables that lacks it: one query when none does."""
+    cursor.execute(
+        "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity "
+        "AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user) "
+        "AND c.relname = ANY(%s) ORDER BY c.relname",
+        [tables],
+    )
+    names = [row[0] for row in cursor.fetchall()]
+    if names:
+        cursor.execute(
+            ";\n".join(
+                "ALTER TABLE public.%s ENABLE ROW LEVEL SECURITY"
+                % connection.ops.quote_name(name)
+                for name in names
+            )
+        )
+    return names
 
 
 def schema_step(log):
@@ -37,6 +73,11 @@ def schema_step(log):
         done = "applied the migrations left to apply"
     else:
         done = "up to date"
+
+    with connection.cursor() as cursor:
+        closed = close_tables(cursor, app_tables())
+    if closed:
+        done += "; turned on row-level security on %d tables" % len(closed)
     return done
 
 
