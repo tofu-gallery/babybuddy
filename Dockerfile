@@ -2,7 +2,8 @@
 #
 # The image Tofu builds and runs for a copy of Baby Buddy (framework preset `container`, see TOFU.md). The
 # compiled styles and scripts are already committed under static/ (with WhiteNoise's manifest), so the image
-# needs no Node build and no collectstatic. tofu-entrypoint.sh applies the migrations, then starts gunicorn on PORT.
+# needs no Node build and no collectstatic. tofu-entrypoint.sh brings the database's schema up to date
+# (babybuddy/tofu_schema.py), then starts gunicorn on PORT.
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
