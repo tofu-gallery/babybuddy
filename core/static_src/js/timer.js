@@ -7,7 +7,12 @@
  *  * timer-hours
  */
 BabyBuddy.Timer = (function ($) {
+  // How often to check the server for changes made in other sessions.
+  var STATUS_INTERVAL = 30000;
+
   var runIntervalId = null;
+  var statusIntervalId = null;
+  var stopped = false;
   var timerId = null;
   var timerElement = null;
   var lastUpdate = new Date();
@@ -33,6 +38,7 @@ BabyBuddy.Timer = (function ($) {
       }
 
       runIntervalId = setInterval(this.tick, 1000);
+      statusIntervalId = setInterval(Timer.checkStatus, STATUS_INTERVAL);
 
       // If the page just came in to view, update the timer data with the
       // current actual duration. This will (potentially) help mobile
@@ -48,7 +54,15 @@ BabyBuddy.Timer = (function ($) {
     },
 
     handleVisibilityChange: function () {
-      if (!document[hidden] && new Date() - lastUpdate > 1) {
+      if (!stopped && !document[hidden] && new Date() - lastUpdate > 1) {
+        Timer.update();
+      }
+    },
+
+    checkStatus: function () {
+      // Skip the request while the page is not visible; the focus handler
+      // updates the timer when the page comes back into view.
+      if (!stopped && !document[hidden]) {
         Timer.update();
       }
     },
@@ -77,23 +91,54 @@ BabyBuddy.Timer = (function ($) {
       h.text(hours + 1);
     },
 
+    handleStoppedTimer: function () {
+      stopped = true;
+      clearInterval(runIntervalId);
+      clearInterval(statusIntervalId);
+      window.removeEventListener("focus", Timer.handleVisibilityChange, false);
+
+      $("#timer-stopped-message").removeClass("d-none");
+
+      var actions = $("#timer-entry-actions, #timer-actions");
+
+      // Links ignore the disabled property, so remove their destination and
+      // take them out of the tab order.
+      actions
+        .find("a")
+        .addClass("disabled")
+        .removeAttr("href")
+        .attr({ "aria-disabled": "true", tabindex: "-1" });
+
+      actions.find("button").prop("disabled", true);
+    },
+
     update: function () {
-      $.get("/api/timers/" + timerId + "/", function (data) {
-        if (data && "duration" in data) {
-          clearInterval(runIntervalId);
-          var duration = data.duration.split(/[\s:.]/);
-          if (duration.length === 5) {
-            duration[0] = parseInt(duration[0]) * 24 + parseInt(duration[1]);
-            duration[1] = duration[2];
-            duration[2] = duration[3];
+      $.get("/api/timers/" + timerId + "/")
+        .done(function (data) {
+          if (!stopped && data && "duration" in data) {
+            clearInterval(runIntervalId);
+
+            var duration = data.duration.split(/[\s:.]/);
+
+            if (duration.length === 5) {
+              duration[0] = parseInt(duration[0]) * 24 + parseInt(duration[1]);
+              duration[1] = duration[2];
+              duration[2] = duration[3];
+            }
+
+            timerElement.find(".timer-hours").text(parseInt(duration[0]));
+            timerElement.find(".timer-minutes").text(parseInt(duration[1]));
+            timerElement.find(".timer-seconds").text(parseInt(duration[2]));
+
+            lastUpdate = new Date();
+            runIntervalId = setInterval(Timer.tick, 1000);
           }
-          timerElement.find(".timer-hours").text(parseInt(duration[0]));
-          timerElement.find(".timer-minutes").text(parseInt(duration[1]));
-          timerElement.find(".timer-seconds").text(parseInt(duration[2]));
-          lastUpdate = new Date();
-          runIntervalId = setInterval(Timer.tick, 1000);
-        }
-      });
+        })
+        .fail(function (xhr) {
+          if (xhr.status === 404) {
+            Timer.handleStoppedTimer();
+          }
+        });
     },
   };
 
